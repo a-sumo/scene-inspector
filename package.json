@@ -1,0 +1,39 @@
+{
+  "name": "scene-inspector",
+  "version": "0.2.0",
+  "description": "Scene graph inspector for Lens Studio. Editor plugin and browser viewer to see every object in your scene, live.",
+  "type": "module",
+  "bin": {
+    "scene-inspector": "server.js"
+  },
+  "files": [
+    "server.js",
+    "index.html",
+    "SceneInspector.ts",
+    "example.js",
+    "plugin/",
+    "README.md"
+  ],
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "keywords": [
+    "lens-studio",
+    "snap",
+    "spectacles",
+    "scene-graph",
+    "inspector",
+    "devtools",
+    "ar"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a-sumo/scene-inspector.git"
+  },
+  "devDependencies": {}
+}

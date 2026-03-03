@@ -1,0 +1,50 @@
+- !<AssetImportMetadata/de1e8c7c-3acd-4a6e-a57d-47dab507e8a3>
+  ImportedAssetIds:
+    TypeScriptAsset: !<reference> 775ddb16-937f-4d57-a4c6-28e2c0cb5f58
+  ImporterName: TypeScriptAssetImporter
+  PrimaryAsset: !<reference> 775ddb16-937f-4d57-a4c6-28e2c0cb5f58
+  PackageType: NotAPackage
+  LegacyPackagePolicy: ~
+  ExtraData:
+    {}
+  AssetDataMap:
+    TypeScriptAsset: !<own> a141b30e-25d4-4ac1-9c10-8b232d6a11d1
+  DependentFiles:
+    []
+  ImporterSettings: !<AssetImporterSettings>
+    {}
+  CompressionSettings: !<own> 00000000-0000-0000-0000-000000000000
+- !<TypeScriptAssetData/a141b30e-25d4-4ac1-9c10-8b232d6a11d1>
+  SvgIcon: ""
+  SetupScript:
+    code: ""
+  Description: ""
+  VersionMajor: 0
+  VersionMinor: 0
+  VersionPatch: 0
+  ComponentUid: e88af0cc-8c2a-4d9f-9a6a-51ac1d2bd2c6
+  ExportUid: 00000000-0000-0000-0000-000000000000
+  PackagePolicy: CanBeUnpacked
+  ScriptInputsHidden:
+    material: false
+    maxBlocks: false
+    spawnInterval: false
+  ScriptTypesHidden:
+    {}
+  ReadMe: !<reference> 00000000-0000-0000-0000-000000000000
+  DeclarationFile: !<reference> 00000000-0000-0000-0000-000000000000
+  Tags:
+    []
+  Attachments:
+    []
+  DefaultScriptInputs:
+    - material: !<reference.Material> 00000000-0000-0000-0000-000000000000
+      spawnInterval: 2.500000
+      maxBlocks: !<float> 12.000000
+  ScriptTypes:
+    -
+      {}
+  InputLines:
+    - '// @input Asset.Material material {"hint":"Material for spawned objects"}'
+    - '// @input float spawnInterval = 3 {"hint":"Seconds between spawning a new object"}'
+    - '// @input float maxBlocks = 6 {"hint":"Max runtime objects alive at once"}'

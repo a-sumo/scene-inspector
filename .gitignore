@@ -1,0 +1,12 @@
+node_modules/
+package-lock.json
+LSProject/Cache/
+LSProject/*.lock
+LSProject/PluginsUserPreferences/
+LSProject/Workspaces/
+test/
+.vercel
+.claude/
+CLAUDE.md
+dist/
+.env*.local
