@@ -117,6 +117,82 @@ body { background: var(--bg); color: var(--text); font-family: var(--font); heig
 .badge-off { display: none; }
 #project-name { font-family: var(--mono); font-size: 10px; color: var(--text); font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toolbar-spacer { flex: 1; }
+
+/* --- Help overlay --- */
+#help-btn {
+  background: none; border: 1px solid var(--border); color: var(--text-muted); width: 18px; height: 18px;
+  border-radius: 50%; font-family: var(--mono); font-size: 10px; font-weight: 600; padding: 0;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all var(--transition); flex-shrink: 0;
+}
+#help-btn:hover { border-color: var(--c-selected); color: var(--c-selected); background: none; }
+#help-overlay {
+  display: none; position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,0.4);
+}
+#help-overlay.visible { display: flex; align-items: center; justify-content: center; }
+#help-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 20px 24px; max-width: 440px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  font-family: var(--font); color: var(--text); position: relative;
+}
+#help-card h2 { font-family: var(--mono); font-size: 13px; font-weight: 600; margin: 0 0 4px; }
+#help-card .help-subtitle { font-size: 11px; color: var(--text-dim); margin-bottom: 14px; line-height: 1.5; }
+#help-card .help-section { margin-bottom: 14px; }
+#help-card .help-section-title {
+  font-family: var(--mono); font-size: 9px; font-weight: 600; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
+}
+#help-card .help-step {
+  display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; font-size: 11px; line-height: 1.5;
+}
+#help-card .help-step-num {
+  font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--c-selected);
+  background: var(--surface); border-radius: 3px; padding: 0 5px; flex-shrink: 0;
+}
+#help-card code {
+  font-family: var(--mono); font-size: 10px; background: var(--surface);
+  padding: 1px 5px; border-radius: 3px; border: 1px solid var(--border);
+}
+#help-card .help-note {
+  font-size: 10px; color: var(--text-dim); line-height: 1.5;
+  padding: 8px 10px; background: var(--surface); border-radius: 4px; border: 1px solid var(--border);
+}
+#help-close {
+  position: absolute; top: 10px; right: 12px; background: none; border: none;
+  font-size: 16px; color: var(--text-muted); cursor: pointer; padding: 2px 6px; line-height: 1;
+}
+#help-close:hover { color: var(--text); }
+
+/* --- Setup banner (persistent, shown until runtime connects) --- */
+#setup-banner {
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 10px 14px; font-size: 11px; line-height: 1.5; display: none; flex-shrink: 0;
+}
+#setup-banner.visible { display: block; }
+#setup-banner .sb-title {
+  font-family: var(--mono); font-size: 10px; font-weight: 600; margin-bottom: 6px;
+  text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-dim);
+}
+#setup-banner .sb-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#setup-banner .sb-btn {
+  padding: 6px 14px; background: var(--c-selected); border: none; border-radius: 4px;
+  font-family: var(--font); font-size: 11px; font-weight: 600; cursor: pointer; color: #fff;
+  white-space: nowrap;
+}
+#setup-banner .sb-btn:hover { opacity: 0.9; }
+#setup-banner .sb-btn:disabled { opacity: 0.5; cursor: default; }
+#setup-banner .sb-status {
+  font-size: 10px; color: var(--text-dim); flex: 1; min-width: 0;
+}
+#setup-banner .sb-path {
+  font-family: var(--mono); font-size: 9px; color: var(--text-muted); margin-top: 4px;
+  word-break: break-all;
+}
+#setup-banner .sb-dismiss {
+  float: right; background: none; border: none; font-size: 13px; color: var(--text-muted);
+  cursor: pointer; padding: 0 2px; line-height: 1;
+}
+#setup-banner .sb-dismiss:hover { color: var(--text); }
+
 /* --- Main layout: top row (hierarchy | inspector) + bottom (3D) --- */
 #main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 #top-row { display: flex; flex-direction: row; flex: 1; min-height: 0; }
@@ -481,9 +557,60 @@ body.tron #tree-header, body.tron #props-header { border-bottom: 1px solid #2a06
     <button class="theme-opt" data-theme="default">DEFAULT</button>
     <button class="theme-opt" data-theme="tron">TRON</button>
   </span>
+  <button id="help-btn" title="Setup guide">?</button>
+</div>
+
+<div id="help-overlay">
+  <div id="help-card">
+    <button id="help-close">&times;</button>
+    <h2>Scene Inspector</h2>
+    <div class="help-subtitle">
+      The panel shows your editor scene graph automatically.
+      To also see objects spawned at runtime, add the SceneInspector script to your scene.
+    </div>
+
+    <div class="help-section">
+      <div class="help-section-title">Runtime setup</div>
+      <div id="help-step-1" class="help-step">
+        <span class="help-step-num">1</span>
+        <span>Add <code>SceneInspector.ts</code> to your project:</span>
+      </div>
+      <button id="add-script-btn" style="width:100%;padding:8px 0;margin:0 0 10px;background:var(--c-selected);border:none;border-radius:4px;font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;color:#fff;">Add SceneInspector.ts to project</button>
+      <div id="add-script-status" style="font-size:10px;color:var(--text-dim);margin-bottom:10px;display:none;padding:6px 8px;background:var(--surface);border-radius:3px;"></div>
+      <div class="help-step">
+        <span class="help-step-num">2</span>
+        <span>Select any SceneObject (the Camera works well) and add <code>SceneInspector</code> as a script component.</span>
+      </div>
+      <div class="help-step">
+        <span class="help-step-num">3</span>
+        <span>Go to <b>Project Settings &gt; General</b> and enable <b>Experimental APIs</b>.</span>
+      </div>
+      <div class="help-step">
+        <span class="help-step-num">4</span>
+        <span>Press <b>Play</b>. The toolbar badge changes from <code>Editor</code> to <code>Lens Studio</code> and runtime-spawned objects appear in the tree.</span>
+      </div>
+    </div>
+
+    <div class="help-note">
+      The plugin auto-configures the WebSocket URL, so you don't need to change the <code>wsUrl</code> input on the script.
+      If you're using the browser viewer instead (<code>npx scene-inspector</code>), the welcome screen has the same steps.
+    </div>
+  </div>
 </div>
 <input type="hidden" id="ws-url" value="ws://localhost:8200">
 <input type="hidden" id="mcp-base" value="http://localhost:8200">
+
+<div id="setup-banner">
+  <button class="sb-dismiss" id="sb-dismiss" title="Dismiss">&times;</button>
+  <div class="sb-title">Runtime objects not visible yet</div>
+  <div>Your editor scene graph is showing, but objects created at runtime by scripts won't appear until you add SceneInspector.ts to your project.</div>
+  <div class="sb-row" style="margin-top:8px;">
+    <button class="sb-btn" id="sb-add-btn">Add SceneInspector.ts to project</button>
+    <span class="sb-status" id="sb-status"></span>
+  </div>
+  <div class="sb-path" id="sb-path"></div>
+  <div style="font-size:10px;color:var(--text-muted);margin-top:6px;">After adding, attach it to any SceneObject, enable <b>Experimental APIs</b> in Project Settings, and hit Play.</div>
+</div>
 
 <div id="main">
   <div id="top-row">
@@ -1772,6 +1899,7 @@ function updateSourceUI() {
     text.textContent = 'connecting...';
     badge.className = 'badge-off';
   }
+  if (window._updateSetupBanner) window._updateSetupBanner();
 }
 
 // --- Built-in demo mode (works without server, e.g. static hosting) ---
@@ -1896,6 +2024,33 @@ function connectWS() {
     try {
       const msg = JSON.parse(e.data);
       if (msg.event === 'reload' && !isEmbedded) { location.reload(); return; }
+      if (msg.event === 'setup_status') {
+        window._hasSceneInspector = msg.hasSceneInspector;
+        if (window._updateSetupBanner) window._updateSetupBanner();
+        return;
+      }
+      if (msg.event === 'add_script_result') {
+        // Update whichever button triggered the add (banner or overlay)
+        const btn = window._addScriptBtn || document.getElementById('add-script-btn');
+        const status = window._addScriptStatus || document.getElementById('add-script-status');
+        if (status) status.style.display = 'block';
+        if (msg.success) {
+          // Update both banner and overlay buttons
+          [document.getElementById('add-script-btn'), document.getElementById('sb-add-btn')].forEach(b => {
+            if (b) { b.textContent = 'Added'; b.style.background = '#30a040'; b.disabled = true; }
+          });
+          if (status) { status.style.color = 'var(--text)'; status.textContent = msg.message; }
+          document.getElementById('sb-status').textContent = msg.message;
+        } else {
+          if (btn) { btn.textContent = 'Add SceneInspector.ts to project'; btn.disabled = false; }
+          if (status) { status.style.color = 'var(--c-disabled)'; status.textContent = msg.message; }
+          document.getElementById('sb-status').textContent = msg.message;
+          // Show the plugin path if returned in the message
+          const sbPath = document.getElementById('sb-path');
+          if (sbPath && msg.message) sbPath.textContent = msg.message;
+        }
+        return;
+      }
       if (msg.event === 'scene_snapshot' && msg.roots) {
         // Live data from server stops demo mode
         if (demoRunning) { clearInterval(demoInterval); demoRunning = false; }
@@ -2402,6 +2557,71 @@ document.getElementById('theme-toggle').addEventListener('click', (e) => {
   if (opt && opt.dataset.theme !== currentTheme) applyTheme(opt.dataset.theme);
 });
 
+// --- Help overlay ---
+document.getElementById('help-btn').addEventListener('click', () => {
+  document.getElementById('help-overlay').classList.toggle('visible');
+});
+document.getElementById('help-close').addEventListener('click', () => {
+  document.getElementById('help-overlay').classList.remove('visible');
+});
+document.getElementById('help-overlay').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('visible');
+});
+// Overlay "Add to Project" button
+document.getElementById('add-script-btn').addEventListener('click', () => {
+  _sendAddScript(document.getElementById('add-script-btn'), document.getElementById('add-script-status'));
+});
+
+// --- Setup banner ---
+{
+  const banner = document.getElementById('setup-banner');
+  const sbBtn = document.getElementById('sb-add-btn');
+  const sbStatus = document.getElementById('sb-status');
+  const sbPath = document.getElementById('sb-path');
+  let bannerDismissed = false;
+
+  // Read plugin path from URL params
+  const _params = new URLSearchParams(location.search);
+  const _pluginDir = _params.get('pluginDir') || '';
+  if (_pluginDir) {
+    sbPath.textContent = 'Plugin folder: ' + _pluginDir;
+  }
+
+  // Show banner in embedded mode when data source is editor (not live)
+  window._updateSetupBanner = function () {
+    if (!isEmbedded || bannerDismissed) { banner.classList.remove('visible'); return; }
+    if (dataSource === 'live' || window._hasSceneInspector) {
+      banner.classList.remove('visible');
+    } else {
+      banner.classList.add('visible');
+    }
+  };
+
+  document.getElementById('sb-dismiss').addEventListener('click', () => {
+    bannerDismissed = true;
+    banner.classList.remove('visible');
+  });
+
+  sbBtn.addEventListener('click', () => {
+    _sendAddScript(sbBtn, sbStatus);
+  });
+}
+
+function _sendAddScript(btn, statusEl) {
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ event: 'add_script' }));
+    // Store refs so the WS handler can update them
+    window._addScriptBtn = btn;
+    window._addScriptStatus = statusEl;
+  } else {
+    if (statusEl) { statusEl.textContent = 'Not connected to plugin service.'; }
+    btn.disabled = false;
+    btn.textContent = 'Add SceneInspector.ts to project';
+  }
+}
+
 // --- Init ---
 initScene3D();
 initResize();
@@ -2426,6 +2646,8 @@ if (isEmbedded) {
   const spacer = document.querySelector('.toolbar-spacer');
   if (spacer) spacer.style.display = 'none';
   document.getElementById('toolbar').style.height = '24px';
+  // Show setup banner immediately (will hide once runtime connects)
+  document.getElementById('setup-banner').classList.add('visible');
   connectWS();
 } else {
   const wasActive = sessionStorage.getItem('scene-inspector-active');

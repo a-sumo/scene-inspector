@@ -17,11 +17,23 @@ import * as ws from "LensStudio:WebSocket";
 import * as Network from "LensStudio:Network";
 import { walkScene } from "./scene-walker.js";
 import { startHttpServer, stopHttpServer } from "./http-server.js";
+import { SCENE_INSPECTOR_TS } from "./scene-inspector-ts.js";
+
+// FileSystem is optional — loaded async to avoid crashing the plugin
+var _fs = null;
+var _fsLoading = import("LensStudio:FileSystem").then(function (m) {
+  _fs = m.default || m;
+  console.log("[scene-inspector] FileSystem loaded");
+}).catch(function (e) {
+  console.log("[scene-inspector] FileSystem not available: " + e);
+});
 
 // ---- Shared state (module-level, accessible by both service and panel) ----
 var wsPort = 0;
 var httpPort = 0;
 var serviceReady = false;
+var pluginDir = ""; // resolved from import.meta.url
+var hasSceneInspector = false; // whether a SceneInspector component exists in the scene
 
 // WebSocket tracking
 var webviewSockets = [];   // connections from the embedded WebEngineView
@@ -60,6 +72,12 @@ export class InspectorService extends CoreService {
     // Get Editor model
     this.model = this.pluginSystem.findInterface(Editor.Model.IModel);
 
+    // Resolve plugin directory from import.meta.url
+    try {
+      var url = import.meta.url || "";
+      pluginDir = url.replace("file://", "").replace(/\/main\.js$/, "");
+    } catch (e) {}
+
     // 1. Start HTTP server to serve viewer HTML
     httpPort = startHttpServer();
 
@@ -71,6 +89,9 @@ export class InspectorService extends CoreService {
 
     // 4. Start scene polling
     this.startPolling();
+
+    // 5. Auto-add SceneInspector.ts to project if not already there
+    this.tryAutoAddScript();
 
     serviceReady = true;
     console.log(
@@ -119,6 +140,7 @@ export class InspectorService extends CoreService {
     // Find all ScriptComponents with a SceneInspector script and set their
     // wsUrl to point at our WS server. This way users just add the script
     // to any object and the plugin handles the rest.
+    var found = false;
     try {
       var scene = this.model.project.scene;
       if (!scene) return;
@@ -132,6 +154,7 @@ export class InspectorService extends CoreService {
             var comp = comps[i];
             var typeName = comp.name || "";
             if (typeName === "SceneInspector" || typeName === "SceneInspectorJS") {
+              found = true;
               // Check if it has a wsUrl property
               if (comp.wsUrl !== undefined && comp.wsUrl !== targetUrl) {
                 comp.wsUrl = targetUrl;
@@ -152,6 +175,32 @@ export class InspectorService extends CoreService {
     } catch (e) {
       console.log("[scene-inspector] Could not auto-configure SceneInspector: " + e);
     }
+
+    // Broadcast status change to viewers
+    if (found !== hasSceneInspector) {
+      hasSceneInspector = found;
+      this._broadcastSetupStatus();
+    }
+  }
+
+  _broadcastSetupStatus() {
+    var msg = JSON.stringify({
+      event: "setup_status",
+      hasSceneInspector: hasSceneInspector,
+      hasRuntime: hasRuntimeSource,
+    });
+    for (var i = 0; i < webviewSockets.length; i++) {
+      try { webviewSockets[i].send(msg); } catch (e) {}
+    }
+  }
+
+  // Debounced re-scan for SceneInspector (entity changes fire rapidly)
+  _debouncedConfigCheck() {
+    var self = this;
+    if (this._configCheckTimer) clearTimeout(this._configCheckTimer);
+    this._configCheckTimer = setTimeout(function () {
+      self.configureRuntimeInspectors();
+    }, 500);
   }
 
   // ---------- WebSocket server ----------
@@ -183,6 +232,8 @@ export class InspectorService extends CoreService {
           if (lastSnapshotJson) {
             try { socket.send(lastSnapshotJson); } catch (e) {}
           }
+          // Send current setup status
+          try { socket.send(JSON.stringify({ event: "setup_status", hasSceneInspector: hasSceneInspector, hasRuntime: hasRuntimeSource })); } catch (e) {}
         }
       }, 2000);
 
@@ -236,6 +287,7 @@ export class InspectorService extends CoreService {
           if (lastSnapshotJson) {
             try { socket.send(lastSnapshotJson); } catch (e) {}
           }
+          try { socket.send(JSON.stringify({ event: "setup_status", hasSceneInspector: hasSceneInspector, hasRuntime: hasRuntimeSource })); } catch (e) {}
           return;
         }
 
@@ -250,6 +302,8 @@ export class InspectorService extends CoreService {
               self.applyTransformEdit(parsed);
             } else if (parsed.event === "set_enabled") {
               self.applyEnabledEdit(parsed);
+            } else if (parsed.event === "add_script") {
+              self.addScriptToProject(socket);
             }
           }
         }
@@ -307,18 +361,21 @@ export class InspectorService extends CoreService {
       if (project && project.onEntityUpdated) {
         var updConn = project.onEntityUpdated("SceneObject").connect(function () {
           if (!hasRuntimeSource) self.debouncedSnapshot();
+          self._debouncedConfigCheck();
         });
         entityConnections.push(updConn);
       }
       if (project && project.onEntityAdded) {
         var addConn = project.onEntityAdded("SceneObject").connect(function () {
           if (!hasRuntimeSource) self.debouncedSnapshot();
+          self._debouncedConfigCheck();
         });
         entityConnections.push(addConn);
       }
       if (project && project.onEntityRemoved) {
         var remConn = project.onEntityRemoved("SceneObject").connect(function () {
           if (!hasRuntimeSource) self.debouncedSnapshot();
+          self._debouncedConfigCheck();
         });
         entityConnections.push(remConn);
       }
@@ -422,6 +479,99 @@ export class InspectorService extends CoreService {
     this.debouncedSnapshot();
   }
 
+  // Import SceneInspector.ts into the project via assetManager
+  _writeScriptToProject() {
+    var am = this.model.project.assetManager;
+    var assetsDir = this.model.project.assetsDirectory;
+
+    // Check if already imported
+    try {
+      var existing = am.findImportedCopy(pluginDir + "/SceneInspector.ts");
+      if (existing) {
+        console.log("[scene-inspector] SceneInspector.ts already imported");
+        return { success: true, message: "SceneInspector.ts already in project." };
+      }
+    } catch (e) {}
+
+    // Source: the bundled copy in the plugin folder
+    var sourcePath = pluginDir + "/SceneInspector.ts";
+
+    // importExternalFile(source, destDir, name) or (source, destDir, name, overwrite)
+    // Try multiple argument patterns since we don't have type definitions
+    var patterns = [
+      [sourcePath, assetsDir, "SceneInspector.ts"],
+      [sourcePath, assetsDir, "SceneInspector"],
+      [sourcePath, "Assets", "SceneInspector.ts"],
+      [sourcePath, assetsDir, "SceneInspector.ts", true],
+    ];
+
+    for (var pi = 0; pi < patterns.length; pi++) {
+      var args = patterns[pi];
+      try {
+        console.log("[scene-inspector] trying importExternalFile(" + args.join(", ") + ")");
+        am.importExternalFile.apply(am, args);
+        console.log("[scene-inspector] importExternalFile succeeded with pattern " + pi);
+        return { success: true, message: "SceneInspector.ts added to project." };
+      } catch (e) {
+        console.log("[scene-inspector] pattern " + pi + " failed: " + e);
+      }
+    }
+
+    // Fallback: try async version
+    try {
+      console.log("[scene-inspector] trying importExternalFileAsync");
+      am.importExternalFileAsync(sourcePath, assetsDir, "SceneInspector.ts");
+      return { success: true, message: "SceneInspector.ts importing (async)..." };
+    } catch (e) {
+      console.log("[scene-inspector] importExternalFileAsync failed: " + e);
+    }
+
+    return { success: false, message: "Import failed. Drag SceneInspector.ts from " + pluginDir + " into your Asset Browser." };
+  }
+
+  // Auto-attempt on startup (waits for FileSystem to load)
+  tryAutoAddScript() {
+    var self = this;
+    // Wait for the dynamic import to resolve, then try
+    _fsLoading.then(function () {
+      try {
+        var result = self._writeScriptToProject();
+        if (result.success) {
+          console.log("[scene-inspector] Auto-added SceneInspector.ts to project");
+        }
+      } catch (e) {
+        console.log("[scene-inspector] Auto-add failed: " + e);
+      }
+    }).catch(function () {});
+  }
+
+  // Triggered by viewer "Add to Project" button
+  addScriptToProject(socket) {
+    var result = { event: "add_script_result", success: false, message: "" };
+    var self = this;
+
+    // Ensure FileSystem is loaded before trying
+    _fsLoading.then(function () {
+      try {
+        var writeResult = self._writeScriptToProject();
+        result.success = writeResult.success;
+        if (writeResult.success) {
+          result.message = writeResult.message + " Attach it to any SceneObject, enable Experimental APIs, and hit Play.";
+        } else {
+          result.message = "Could not auto-add. Find SceneInspector.ts at: " + pluginDir + " — drag it into your project's Asset Browser.";
+        }
+      } catch (e) {
+        result.message = "Failed: " + e + ". Find SceneInspector.ts at: " + pluginDir;
+        console.error("[scene-inspector] addScriptToProject failed: " + e);
+      }
+
+      try { socket.send(JSON.stringify(result)); } catch (e) {}
+    }).catch(function () {
+      result.message = "FileSystem unavailable. Find SceneInspector.ts at: " + pluginDir + " — drag it into your project's Asset Browser.";
+      try { socket.send(JSON.stringify(result)); } catch (e) {}
+    });
+  }
+
   debouncedSnapshot() {
     if (hasRuntimeSource) return; // Runtime will send its own updated snapshot
     var self = this;
@@ -514,7 +664,8 @@ export class InspectorPanel extends PanelPlugin {
       httpPort +
       "/?wsPort=" +
       wsPort +
-      "&embedded=true";
+      "&embedded=true" +
+      (pluginDir ? "&pluginDir=" + encodeURIComponent(pluginDir) : "");
 
     webview.load(url);
     layout.addWidget(webview);

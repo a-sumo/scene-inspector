@@ -1,6 +1,6 @@
 {
   "name": "scene-inspector",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Scene graph inspector for Lens Studio. Editor plugin and browser viewer to see every object in your scene, live.",
   "type": "module",
   "bin": {

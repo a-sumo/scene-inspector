@@ -2,5 +2,5 @@
   "name": "Scene Inspector",
   "description": "Live scene graph viewer with 3D viewport, searchable hierarchy, and component inspector. Shows runtime-spawned objects invisible to the Scene Hierarchy.",
   "main": "main.js",
-  "permissions": ["network"]
+  "permissions": ["network", "filesystem"]
 }

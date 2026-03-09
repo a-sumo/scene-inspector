@@ -30,12 +30,12 @@ By default the plugin reads the scene through the Editor API, which covers every
 
 To see those objects:
 
-1. Copy `SceneInspector.ts` from this repo into your Lens Studio project's Assets folder
+1. Find `SceneInspector.ts` in the Scene Inspector plugin folder (or in this repo's `plugin/` directory) and drag it into your project's Asset Browser
 2. Attach the SceneInspector component to any SceneObject (e.g. Camera)
 3. In Lens Studio, go to **Project Settings > General** and enable **Experimental APIs**
 4. Hit Play
 
-The plugin auto-detects the runtime connection and switches from editor-mode to live-mode, falling back to the editor graph when you stop preview.
+The plugin auto-detects the runtime connection and switches from editor-mode to live-mode, falling back to the editor graph when you stop preview. Click the **?** button in the panel toolbar to see these steps from inside the plugin.
 
 ![Runtime-spawned objects appearing live](media/04-runtime.png)
 

@@ -10,11 +10,13 @@
 
 import * as Network from "LensStudio:Network";
 import { VIEWER_HTML } from "./viewer-html.js";
+import { SCENE_INSPECTOR_TS } from "./scene-inspector-ts.js";
 
 var tcpServer = null;
 var sockets = [];      // prevent GC of active sockets
 var connections = [];   // prevent GC of event connections
 var htmlContent = VIEWER_HTML;
+var tsContent = SCENE_INSPECTOR_TS;
 // Compute UTF-8 byte length (String.length counts characters, not bytes)
 var htmlBytes = 0;
 for (var ci = 0; ci < htmlContent.length; ci++) {
@@ -59,6 +61,20 @@ export function startHttpServer() {
       var parts = firstLine.split(" ");
       var method = parts[0] || "";
       var path = parts[1] || "/";
+
+      // Serve SceneInspector.ts for download
+      if (method === "GET" && path === "/SceneInspector.ts") {
+        var tsResponse =
+          "HTTP/1.1 200 OK\r\n" +
+          "Content-Type: text/plain; charset=utf-8\r\n" +
+          "Content-Length: " + tsContent.length + "\r\n" +
+          "Cache-Control: no-cache\r\n" +
+          "Connection: close\r\n" +
+          "\r\n" +
+          tsContent;
+        try { socket.write(tsResponse); } catch (e) {}
+        return;
+      }
 
       if (method === "GET" && (path === "/" || path.indexOf("/?") === 0 || path === "/index.html")) {
         var response =
